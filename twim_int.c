@@ -5,6 +5,9 @@
  *  Author: awells
  */ 
 
+typedef int pedantic; // FOR PEDANTIC COMPILER WARNING
+
+#ifdef TWIM_INT
 #include "twi.h"
 #include <avr/interrupt.h>
 
@@ -16,6 +19,7 @@ volatile TWI_INFO_STRUCT *TWI_INFO;
 // TODO: CALCULATE BUAD WITH F_CPU
 // TODO: ERROR CHECKING
 // TODO: CHECK RXACK REG IN ERROR CHECKING
+// TODO: CHECK WIF WHEN SENDING NACK IN MASTER READ
 //--------------------------------------------------------------------
 
 //--------------------------------------------------------------------
@@ -23,6 +27,7 @@ volatile TWI_INFO_STRUCT *TWI_INFO;
 //	-make sure to enable global interrupts (sei)
 //	-make sure to enable correct interrupt levels (PMIC.CTRL)
 //	-make sure to define F_CPU
+//  -DEFINE TWIM_INT for interrupt lib
 //--------------------------------------------------------------------
 
 //--------------------------
@@ -51,35 +56,11 @@ void TWI_Init_Master(TWI_MASTER_INTLVL_t twi_master_intlv) {
 	TWIC.CTRL = 0; // SDA HOLD TIME OFF
 	TWIC.MASTER.CTRLA = twi_master_intlv | TWI_MASTER_RIEN_bm | TWI_MASTER_WIEN_bm | TWI_MASTER_ENABLE_bm; // SET INTERRUPT LV | ENABLE READ INTERRUPT | ENABLE WRITE INTERRUPT | ENABLE TWI
 	TWIC.MASTER.CTRLB = TWI_MASTER_TIMEOUT_200US_gc; // SET TIMEOUT FOR BUS TO 200US
-	TWIC.MASTER.CTRLC = 0;
+	TWIC.MASTER.CTRLC = 0; // CLEAR COMMAND REGISTER
 	
 	TWIC.MASTER.STATUS = TWI_MASTER_BUSSTATE_IDLE_gc; // PUT TWI BUS INTO IDLE STATE
 	
 	TWI_INFO->mode = MODE_IDLE;
-}
-
-// WAIT FOR TWI BUS TO BE IDLE
-void TWI_Idle_Bus(void) {
-	while(!(TWIC.MASTER.STATUS & TWI_MASTER_BUSSTATE_IDLE_gc)) {
-		//do nothing
-		//TODO: Possibly delay here
-	}
-}
-
-// CHECK FOR BUS ERROR WHEN WRITING
-void TWI_Write_Bus_Error_Check(void) {
-	if (!(TWIC.MASTER.STATUS & TWI_MASTER_WIF_bm) || TWIC.MASTER.STATUS & (TWI_MASTER_BUSERR_bm || TWI_MASTER_ARBLOST_bm)) { // WRITE FLAG NOT WRITTEN || (BUSERROR || ARBITRATION LOST)
-		// something went wrong
-		//TODO: Error handling
-	}
-}
-
-// CHECK FOR BUS ERROR WHEN READING
-void TWI_Read_Bus_Error_Check(void) {
-	if (!(TWIC.MASTER.STATUS & TWI_MASTER_RIEN_bm) || TWIC.MASTER.STATUS & (TWI_MASTER_BUSERR_bm || TWI_MASTER_ARBLOST_bm)) { // READ FLAG NOT WRITTEN || (BUSERROR || ARBITRATION LOST)
-		// something went wrong
-		//TODO: Error handling
-	}
 }
 
 // READ DATA FROM REG
@@ -132,7 +113,7 @@ ISR(TWIC_TWIM_vect) {
 	switch(TWI_INFO->mode) {
 
 		case MODE_MASTER_WRITE:
-			TWI_Write_Bus_Error_Check();
+			TWI_Write_Error_Check();
 			
 			switch(TWI_INFO->state) {
 				
@@ -156,7 +137,7 @@ ISR(TWIC_TWIM_vect) {
 			}
 			break;
 		case MODE_MASTER_READ:
-			TWI_Read_Bus_Error_Check();
+			TWI_Read_Error_Check();
 			
 			switch(TWI_INFO->state) {
 				
@@ -179,7 +160,7 @@ ISR(TWIC_TWIM_vect) {
 			}
 			break;
 		case MODE_MASTER_READ_REG:
-			TWI_Write_Bus_Error_Check();
+			TWI_Write_Error_Check();
 			
 			switch(TWI_INFO->state) {
 				
@@ -201,3 +182,4 @@ ISR(TWIC_TWIM_vect) {
 			break;
 	}
 }
+#endif //TWIM_INT
