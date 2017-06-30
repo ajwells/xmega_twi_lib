@@ -1,11 +1,11 @@
 /*
- * twi_lib.c
+ * twim_int.c
  *
  * Created: 6/21/2017 3:53:31 PM
  *  Author: awells
  */ 
 
-#include "twi_lib.h"
+#include "twi.h"
 #include <avr/interrupt.h>
 
 volatile TWI_INFO_STRUCT *TWI_INFO;
