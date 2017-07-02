@@ -18,7 +18,7 @@ volatile TWI_INFO_STRUCT *TWI_INFO;
 //  -DEFINE TWIM_POLL for polling lib
 //--------------------------------------------------------------------
 
-void TWI_Init_Master(void) {
+void TWI_InitMaster(void) {
 	
 	volatile TWI_INFO_STRUCT *TWI_INFO = malloc(sizeof(TWI_INFO_STRUCT));
 	
@@ -47,16 +47,16 @@ void TWI_Init_Master(void) {
 }
 
 // READ DATA FROM REG
-void TWI_Read_Reg(void) {
+void TWI_ReadReg(void) {
 	
 	TWI_INFO->mode = MODE_MASTER_READ_REG;
-	TWI_Start_Write();
+	TWI_StartWrite();
 	
 	while (!(TWIC.MASTER.STATUS & TWI_MASTER_WIF_bm)) {
 		// wait possible delay here
 	}
 	
-	TWI_Write_Error_Check();
+	TWI_WriteErrorCheck();
 	
 	// WRITE ADDRESS
 	TWIC.MASTER.DATA = TWI_INFO->registerAddress;
@@ -66,7 +66,7 @@ void TWI_Read_Reg(void) {
 		// wait possible delay here
 	}
 	
-	TWI_Write_Error_Check();
+	TWI_WriteErrorCheck();
 	
 	// SEND REPEATED START
 	TWI_INFO->mode = MODE_MASTER_READ;
@@ -77,14 +77,14 @@ void TWI_Read_Reg(void) {
 		// wait possible delay here
 	}
 	
-	TWI_Read_Error_Check();
+	TWI_ReadErrorCheck();
 	
 	for (TWI_INFO->dataCount=0; TWI_INFO->dataCount < TWI_INFO->dataLength; TWI_INFO->dataCount++) {
 		TWI_INFO->dataBuf[TWI_INFO->dataCount] = TWIC.MASTER.DATA;
 		while (!(TWIC.MASTER.STATUS & (TWI_MASTER_RIF_bm | TWI_MASTER_BUSERR_bm | TWI_MASTER_ARBLOST_bm))) {
 			// wait possible delay here
 		}
-		TWI_Read_Error_Check();
+		TWI_ReadErrorCheck();
 	}
 	
 	// SEND STOP
@@ -98,20 +98,20 @@ void TWI_Read_Reg(void) {
 void TWI_Read(void) {
 	
 	TWI_INFO->mode = MODE_MASTER_READ;
-	TWI_Start_Read();
+	TWI_StartRead();
 	
 	while (!(TWIC.MASTER.STATUS & (TWI_MASTER_RIF_bm | TWI_MASTER_BUSERR_bm | TWI_MASTER_ARBLOST_bm))) {
 		// wait possible delay here
 	}
 	
-	TWI_Read_Error_Check();
+	TWI_ReadErrorCheck();
 	
 	for (TWI_INFO->dataCount=0; TWI_INFO->dataCount < TWI_INFO->dataLength; TWI_INFO->dataCount++) {
 		TWI_INFO->dataBuf[TWI_INFO->dataCount] = TWIC.MASTER.DATA;
 		while (!(TWIC.MASTER.STATUS & (TWI_MASTER_RIF_bm | TWI_MASTER_BUSERR_bm | TWI_MASTER_ARBLOST_bm))) {
 			// wait possible delay here
 		}
-		TWI_Read_Error_Check();
+		TWI_ReadErrorCheck();
 	}
 	
 	// SEND STOP
@@ -125,13 +125,13 @@ void TWI_Read(void) {
 void TWI_Write(void) {
 	
 	TWI_INFO->mode = MODE_MASTER_WRITE;
-	TWI_Start_Write();
+	TWI_StartWrite();
 	
 	while (!(TWIC.MASTER.STATUS & TWI_MASTER_WIF_bm)) {
 		// wait possible delay here
 	}
 	
-	TWI_Write_Error_Check();
+	TWI_WriteErrorCheck();
 	
 	// WRITE ADDRESS
 	TWIC.MASTER.DATA = TWI_INFO->registerAddress;
@@ -141,7 +141,7 @@ void TWI_Write(void) {
 		// wait possible delay here
 	}
 	
-	TWI_Write_Error_Check();
+	TWI_WriteErrorCheck();
 	
 	// WRITE DATA
 	for (TWI_INFO->dataCount=0; TWI_INFO->dataCount < TWI_INFO->dataLength; TWI_INFO->dataCount++) {
@@ -149,7 +149,7 @@ void TWI_Write(void) {
 		while (!(TWIC.MASTER.STATUS & TWI_MASTER_WIF_bm)) {
 			// wait possible delay here
 		}
-		TWI_Write_Error_Check();
+		TWI_WriteErrorCheck();
 	}
 	
 	// SEND STOP

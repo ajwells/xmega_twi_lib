@@ -27,7 +27,7 @@ volatile TWI_INFO_STRUCT *TWI_INFO;
 //	-make sure to enable global interrupts (sei)
 //	-make sure to enable correct interrupt levels (PMIC.CTRL)
 //	-make sure to define F_CPU
-//  -DEFINE TWIM_INT for interrupt lib
+// 	-DEFINE TWIM_INT for interrupt lib
 //--------------------------------------------------------------------
 
 //--------------------------
@@ -35,7 +35,7 @@ volatile TWI_INFO_STRUCT *TWI_INFO;
 //--------------------------
 
 // SETUP TWI
-void TWI_Init_Master(TWI_MASTER_INTLVL_t twi_master_intlv) {
+void TWI_InitMaster(TWI_MASTER_INTLVL_t twi_master_intlv) {
 	
 	volatile TWI_INFO_STRUCT *TWI_INFO = malloc(sizeof(TWI_INFO_STRUCT));
 	
@@ -64,25 +64,25 @@ void TWI_Init_Master(TWI_MASTER_INTLVL_t twi_master_intlv) {
 }
 
 // READ DATA FROM REG
-void TWI_Read_Reg(void) {
+void TWI_ReadReg(void) {
 	TWI_INFO->mode = MODE_MASTER_READ_REG;
-	TWI_Start_Write();
+	TWI_StartWrite();
 }
 
 // READ DATA
 void TWI_Read(void) {
 	TWI_INFO->mode = MODE_MASTER_READ;
-	TWI_Start_Read();
+	TWI_StartRead();
 }
 
 // WRITE DATA
 void TWI_Write(void) {
 	TWI_INFO->mode = MODE_MASTER_WRITE;
-	TWI_Start_Write();
+	TWI_StartWrite();
 }
 
 // INITIATE WRITE TO TWI_INFO->bus_address
-void TWI_Start_Write(void) {
+void TWI_StartWrite(void) {
 	
 	//RESET VARIABLES
 	TWI_INFO->dataCount = 0x00;
@@ -95,7 +95,7 @@ void TWI_Start_Write(void) {
 }
 
 // INITIATE READ TO TWI_INFO->bus_address
-void TWI_Start_Read(void) {
+void TWI_StartRead(void) {
 	
 	//RESET VARIABLES
 	TWI_INFO->dataCount = 0x00;
@@ -113,7 +113,7 @@ ISR(TWIC_TWIM_vect) {
 	switch(TWI_INFO->mode) {
 
 		case MODE_MASTER_WRITE:
-			TWI_Write_Error_Check();
+			TWI_WriteErrorCheck();
 			
 			switch(TWI_INFO->state) {
 				
@@ -137,7 +137,7 @@ ISR(TWIC_TWIM_vect) {
 			}
 			break;
 		case MODE_MASTER_READ:
-			TWI_Read_Error_Check();
+			TWI_ReadErrorCheck();
 			
 			switch(TWI_INFO->state) {
 				
@@ -160,7 +160,7 @@ ISR(TWIC_TWIM_vect) {
 			}
 			break;
 		case MODE_MASTER_READ_REG:
-			TWI_Write_Error_Check();
+			TWI_WriteErrorCheck();
 			
 			switch(TWI_INFO->state) {
 				

@@ -56,20 +56,19 @@ extern volatile TWI_INFO_STRUCT *TWI_INFO;
 
 // FUNCTIONS
 #ifdef TWIM_INT
-void TWI_Init_Master(TWI_MASTER_INTLVL_t twi_master_intlv);
+void TWI_InitMaster(TWI_MASTER_INTLVL_t twi_master_intlv);
 #endif
 #ifdef TWIM_POLL
-void TWI_Init_Master(void);
+void TWI_InitMaster(void);
 #endif
-void TWI_Idle_Bus(void);
-void TWI_Write_Error_Check(void);
-void TWI_Read_Error_Check(void);
-void TWI_Start_Read(void);
-void TWI_Start_Write(void);
+void TWI_IdleBus(void);
+void TWI_WriteErrorCheck(void);
+void TWI_ReadErrorCheck(void);
+void TWI_StartRead(void);
+void TWI_StartWrite(void);
 
-void TWI_Read_Reg(void);
+void TWI_ReadReg(void);
 void TWI_Read(void);
 void TWI_Write(void);
-
 
 #endif // _TWI_LIB_
