@@ -5,33 +5,10 @@
  *  Author: awells
  */ 
 
-#include "twi.h"
+#include "twim.h"
 #ifdef TWIM_INT
 #include <avr/interrupt.h>
 #include <util/atomic.h>
-
-//--------------------------------------------------------------------
-// TODO: CHECK IF OUT OF BOUNDS ON DATA BUFFER
-// TODO: ASSUMES REGISTER ADDRESSES ARE ONLY 1 BYTE
-// TODO: CALCULATE BUAD WITH F_CPU
-// TODO: ERROR CHECKING
-// TODO: CHECK RXACK REG IN ERROR CHECKING
-// TODO: CHECK WIF WHEN SENDING NACK IN MASTER READ
-// TODO: CHECK WHAT NEEDS TO BE ATOMIC
-// TODO: ADD TWIE ISR
-//--------------------------------------------------------------------
-
-//--------------------------------------------------------------------
-// TO USE:
-//	-make sure to enable global interrupts (sei)
-//	-make sure to enable correct interrupt levels (PMIC.CTRL)
-//	-make sure to define F_CPU
-// 	-DEFINE TWIM_INT for interrupt lib
-//--------------------------------------------------------------------
-
-//--------------------------
-// TWI FUNCTIONS
-//--------------------------
 
 // SETUP TWI
 void TWI_InitMaster_Int(TWI_MASTER_INTLVL_t twi_master_intlv) {
@@ -76,7 +53,7 @@ void TWI_RegisterStruct_Int(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	} else if (TWI_INFO->port == &(PORT_TWIE)) {
 		TWIE_INFO = TWI_INFO;
 	} else {
-		// not a valid port
+		exit(EXIT_FAILURE); // NOT A VALID TWI PORT
 	}
 }
 
@@ -127,7 +104,7 @@ ISR(TWIC_TWIM_vect) {
 					}
 					break;
 				default:
-					//TODO: ERROR HANDLING
+					exit(EXIT_FAILURE); // NOT IN CORRECT STATE
 					break;
 			}
 			break;
@@ -150,7 +127,7 @@ ISR(TWIC_TWIM_vect) {
 					}
 					break;
 				default:
-					//TODO: ERROR HANDLING
+					exit(EXIT_FAILURE); // NOT IN CORRECT STATE
 					break;
 			}
 			break;
@@ -169,12 +146,12 @@ ISR(TWIC_TWIM_vect) {
 					TWIC.MASTER.ADDR = ((TWIC_INFO->busAddress) << 1 | 0x01); // SEND REPEATED START
 					break;
 				default:
-					//TODO: ERROR HANDLING
+					exit(EXIT_FAILURE); // NOT IN CORRECT STATE
 					break;
 			}
 			break;
 		default:
-			// error if here
+			exit(EXIT_FAILURE); // NOT IN CORRECT MODE
 			break;
 	}
 }
@@ -205,7 +182,7 @@ ISR(TWIE_TWIM_vect) {
 					}
 					break;
 				default:
-					//TODO: ERROR HANDLING
+					exit(EXIT_FAILURE); // NOT IN CORRECT STATE
 					break;
 			}
 			break;
@@ -228,7 +205,7 @@ ISR(TWIE_TWIM_vect) {
 					}
 					break;
 				default:
-					//TODO: ERROR HANDLING
+					exit(EXIT_FAILURE); // NOT IN CORRECT STATE
 					break;
 			}
 			break;
@@ -247,12 +224,12 @@ ISR(TWIE_TWIM_vect) {
 					TWIE.MASTER.ADDR = ((TWIE_INFO->busAddress) << 1 | 0x01); // SEND REPEATED START
 					break;
 				default:
-					//TODO: ERROR HANDLING
+					exit(EXIT_FAILURE); // NOT IN CORRECT STATE
 					break;
 			}
 			break;
 		default:
-			// error if here
+			exit(EXIT_FAILURE); // NOT IN CORRECT MODE
 			break;
 	}
 }

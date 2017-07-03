@@ -5,26 +5,11 @@
  *  Author: awells
  */ 
 
-#include "twi.h"
+#include "twim.h"
 #ifdef TWIM_POLL
 #include <util/atomic.h>
 
-//--------------------------------------------------------------------
-// TODO: CHECK IF OUT OF BOUNDS ON DATA BUFFER
-// TODO: ASSUMES REGISTER ADDRESSES ARE ONLY 1 BYTE
-// TODO: CALCULATE BUAD WITH F_CPU
-// TODO: ERROR CHECKING
-// TODO: CHECK RXACK REG IN ERROR CHECKING
-// TODO: CHECK WIF WHEN SENDING NACK IN MASTER READ
-// TODO: CHECK WHAT NEEDS TO BE ATOMIC
-//--------------------------------------------------------------------
-
-//--------------------------------------------------------------------
-// TO USE:
-//	-make sure to define F_CPU
-//  -DEFINE TWIM_POLL for polling lib
-//--------------------------------------------------------------------
-
+// SETUP TWI
 void TWI_InitMaster_Poll(void) {
 	
 	#ifdef USE_TWIC
@@ -59,10 +44,12 @@ void TWI_InitMaster_Poll(void) {
 	#endif //USE_TWIE
 }
 
+// "REGISTER" BY SETTING MODE TO IDLE
 void TWI_RegisterStruct_Poll(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	TWI_INFO->mode = MODE_IDLE;
 }
 
+// WAIT FOR TWI BUS TO BE IDLE, THEN CHECK FOR WRITE ERRORS
 void TWI_WriteWaitAndCheck(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	
 	while (!(TWI_INFO->port->MASTER.STATUS & TWI_MASTER_WIF_bm)) {
@@ -72,6 +59,7 @@ void TWI_WriteWaitAndCheck(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	TWI_WriteErrorCheck(TWI_INFO);
 }
 
+// WAIT FOR TWI BUS TO BE IDLE, THEN CHECK FOR READ ERRORS
 void TWI_ReadWaitAndCheck(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	
 	while (!(TWI_INFO->port->MASTER.STATUS & (TWI_MASTER_RIF_bm | TWI_MASTER_BUSERR_bm | TWI_MASTER_ARBLOST_bm))) {

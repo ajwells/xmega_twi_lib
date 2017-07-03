@@ -5,13 +5,33 @@
  *  Author: awells
  */ 
 
-#ifndef _TWI_LIB_
-#define _TWI_LIB_
+//--------------------------------------------------------------------
+// TODO: CHECK IF OUT OF BOUNDS ON DATA BUFFER
+// TODO: ASSUMES REGISTER ADDRESSES ARE ONLY 1 BYTE
+// TODO: CALCULATE BUAD WITH F_CPU
+// TODO: ERROR CHECKING
+// TODO: CHECK RXACK REG IN ERROR CHECKING
+// TODO: CHECK WIF WHEN SENDING NACK IN MASTER READ
+// TODO: CHECK WHAT NEEDS TO BE ATOMIC
+//--------------------------------------------------------------------
+
+//--------------------------------------------------------------------
+// TO USE:
+//	-make sure to define F_CPU
+//  -DEFINE TWIM_POLL for polling lib
+// 	-DEFINE TWIM_INT for interrupt lib
+//	-DEFINE USE_TWIC/USE_TWIE for correct TWI Port
+//	-make sure to enable global interrupts (sei) for interrupt lib
+//	-make sure to enable correct interrupt levels (PMIC.CTRL) for interrupt lib
+//--------------------------------------------------------------------
+
+#ifndef _TWIM_LIB_
+#define _TWIM_LIB_
 
 #include <stdlib.h>
 #include <avr/io.h>
 
-// DEFINES FOR USAGE
+// DEFINES FOR LIB USAGE
 #define USE_TWIC
 #define USE_TWIE
 #define TWIM_POLL
