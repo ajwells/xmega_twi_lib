@@ -9,8 +9,19 @@ typedef int pedantic; // FOR PEDANTIC COMPILER WARNING
 
 #ifdef TWIM_POLL
 #include "twi.h"
+#include <util/atomic.h>
 
 volatile TWI_INFO_STRUCT *TWI_INFO;
+
+//--------------------------------------------------------------------
+// TODO: CHECK IF OUT OF BOUNDS ON DATA BUFFER
+// TODO: ASSUMES REGISTER ADDRESSES ARE ONLY 1 BYTE
+// TODO: CALCULATE BUAD WITH F_CPU
+// TODO: ERROR CHECKING
+// TODO: CHECK RXACK REG IN ERROR CHECKING
+// TODO: CHECK WIF WHEN SENDING NACK IN MASTER READ
+// TODO: CHECK WHAT NEEDS TO BE ATOMIC
+//--------------------------------------------------------------------
 
 //--------------------------------------------------------------------
 // TO USE:
@@ -18,73 +29,67 @@ volatile TWI_INFO_STRUCT *TWI_INFO;
 //  -DEFINE TWIM_POLL for polling lib
 //--------------------------------------------------------------------
 
-void TWI_InitMaster(void) {
+void TWI_InitMaster_Poll(void) {
 	
-	volatile TWI_INFO_STRUCT *TWI_INFO = malloc(sizeof(TWI_INFO_STRUCT));
+	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+		PR.PRPC &= ~PR_TWI_bm; // ENSURE TWI CLOCK IS ACTIVE
 	
-	TWI_INFO->mode = MODE_INIT;
-	TWI_INFO->status = STATUS_IDLE;
-	TWI_INFO->state = STATE_REGISTER;
-	TWI_INFO->busAddress = 0x00;
-	TWI_INFO->registerAddress = 0x00;
-	TWI_INFO->dataBuf = NULL;
-	TWI_INFO->dataLength = 0x00;
-	TWI_INFO->dataCount = 0x00;
+		TWIC.MASTER.BAUD = 65; // 100KHz, (Fclk/(2*Ftwi)) -5 //TODO: change this so it is not hard coded with fclk
 	
-	PR.PRPC &= ~PR_TWI_bm; // ENSURE TWI CLOCK IS ACTIVE
-	
-	TWIC.MASTER.BAUD = 65; // 100KHz, (Fclk/(2*Ftwi)) -5 //TODO: change this so it is not hard coded with fclk
-	
-	TWIC.CTRL = 0; // SDA HOLD TIME OFF
-	TWIC.MASTER.CTRLA = TWI_MASTER_ENABLE_bm; // ENABLE WITH NO INTERRUPTS
-	TWIC.MASTER.CTRLB = TWI_MASTER_TIMEOUT_200US_gc; // SET TIMEOUT FOR BUS TO 200US
-	TWIC.MASTER.CTRLC = 0; // CLEAR COMMAND REGISTER
+		TWIC.CTRL = 0; // SDA HOLD TIME OFF
+		TWIC.MASTER.CTRLA = TWI_MASTER_ENABLE_bm; // ENABLE WITH NO INTERRUPTS
+		TWIC.MASTER.CTRLB = TWI_MASTER_TIMEOUT_200US_gc; // SET TIMEOUT FOR BUS TO 200US
+		TWIC.MASTER.CTRLC = 0; // CLEAR COMMAND REGISTER
 
 	
-	TWIC.MASTER.STATUS = TWI_MASTER_BUSSTATE_IDLE_gc; // PUT TWI BUS INTO IDLE STATE
+		TWIC.MASTER.STATUS = TWI_MASTER_BUSSTATE_IDLE_gc; // PUT TWI BUS INTO IDLE STATE
 	
-	TWI_INFO->mode = MODE_IDLE;
+		TWI_INFO->mode = MODE_IDLE;
+	}
 }
 
-// READ DATA FROM REG
-void TWI_ReadReg(void) {
-	
-	TWI_INFO->mode = MODE_MASTER_READ_REG;
-	TWI_StartWrite();
+void TWI_WriteWaitAndCheck(void) {
 	
 	while (!(TWIC.MASTER.STATUS & TWI_MASTER_WIF_bm)) {
 		// wait possible delay here
 	}
 	
 	TWI_WriteErrorCheck();
-	
-	// WRITE ADDRESS
-	TWIC.MASTER.DATA = TWI_INFO->registerAddress;
-	TWI_INFO->state = STATE_DATA;
-	
-	while (!(TWIC.MASTER.STATUS & TWI_MASTER_WIF_bm)) {
-		// wait possible delay here
-	}
-	
-	TWI_WriteErrorCheck();
-	
-	// SEND REPEATED START
-	TWI_INFO->mode = MODE_MASTER_READ;
-	TWI_INFO->state = STATE_DATA;
-	TWIC.MASTER.ADDR = ((TWI_INFO->busAddress) << 1 | 0x01); // SEND REPEATED START
+}
+
+void TWI_ReadWaitAndCheck(void) {
 	
 	while (!(TWIC.MASTER.STATUS & (TWI_MASTER_RIF_bm | TWI_MASTER_BUSERR_bm | TWI_MASTER_ARBLOST_bm))) {
 		// wait possible delay here
 	}
 	
 	TWI_ReadErrorCheck();
+}
+
+// READ DATA FROM REG
+void TWI_ReadReg_Poll(void) {
+	
+	TWI_INFO->mode = MODE_MASTER_READ_REG;
+	TWI_StartWrite();
+	
+	TWI_WriteWaitAndCheck();
+	
+	// WRITE ADDRESS
+	TWIC.MASTER.DATA = TWI_INFO->registerAddress;
+	TWI_INFO->state = STATE_DATA;
+	
+	TWI_WriteWaitAndCheck();
+	
+	// SEND REPEATED START
+	TWI_INFO->mode = MODE_MASTER_READ;
+	TWI_INFO->state = STATE_DATA;
+	TWIC.MASTER.ADDR = ((TWI_INFO->busAddress) << 1 | 0x01); // SEND REPEATED START
+	
+	TWI_ReadWaitAndCheck();
 	
 	for (TWI_INFO->dataCount=0; TWI_INFO->dataCount < TWI_INFO->dataLength; TWI_INFO->dataCount++) {
 		TWI_INFO->dataBuf[TWI_INFO->dataCount] = TWIC.MASTER.DATA;
-		while (!(TWIC.MASTER.STATUS & (TWI_MASTER_RIF_bm | TWI_MASTER_BUSERR_bm | TWI_MASTER_ARBLOST_bm))) {
-			// wait possible delay here
-		}
-		TWI_ReadErrorCheck();
+		TWI_ReadWaitAndCheck();
 	}
 	
 	// SEND STOP
@@ -95,23 +100,16 @@ void TWI_ReadReg(void) {
 }
 
 // READ DATA
-void TWI_Read(void) {
+void TWI_Read_Poll(void) {
 	
 	TWI_INFO->mode = MODE_MASTER_READ;
 	TWI_StartRead();
 	
-	while (!(TWIC.MASTER.STATUS & (TWI_MASTER_RIF_bm | TWI_MASTER_BUSERR_bm | TWI_MASTER_ARBLOST_bm))) {
-		// wait possible delay here
-	}
-	
-	TWI_ReadErrorCheck();
+	TWI_ReadWaitAndCheck();
 	
 	for (TWI_INFO->dataCount=0; TWI_INFO->dataCount < TWI_INFO->dataLength; TWI_INFO->dataCount++) {
 		TWI_INFO->dataBuf[TWI_INFO->dataCount] = TWIC.MASTER.DATA;
-		while (!(TWIC.MASTER.STATUS & (TWI_MASTER_RIF_bm | TWI_MASTER_BUSERR_bm | TWI_MASTER_ARBLOST_bm))) {
-			// wait possible delay here
-		}
-		TWI_ReadErrorCheck();
+		TWI_ReadWaitAndCheck();
 	}
 	
 	// SEND STOP
@@ -122,34 +120,23 @@ void TWI_Read(void) {
 }
 
 // WRITE DATA
-void TWI_Write(void) {
+void TWI_Write_Poll(void) {
 	
 	TWI_INFO->mode = MODE_MASTER_WRITE;
 	TWI_StartWrite();
 	
-	while (!(TWIC.MASTER.STATUS & TWI_MASTER_WIF_bm)) {
-		// wait possible delay here
-	}
-	
-	TWI_WriteErrorCheck();
+	TWI_WriteWaitAndCheck();
 	
 	// WRITE ADDRESS
 	TWIC.MASTER.DATA = TWI_INFO->registerAddress;
 	TWI_INFO->state = STATE_DATA;
 	
-	while (!(TWIC.MASTER.STATUS & TWI_MASTER_WIF_bm)) {
-		// wait possible delay here
-	}
-	
-	TWI_WriteErrorCheck();
+	TWI_WriteWaitAndCheck();
 	
 	// WRITE DATA
 	for (TWI_INFO->dataCount=0; TWI_INFO->dataCount < TWI_INFO->dataLength; TWI_INFO->dataCount++) {
 		TWIC.MASTER.DATA = TWI_INFO->dataBuf[TWI_INFO->dataCount];
-		while (!(TWIC.MASTER.STATUS & TWI_MASTER_WIF_bm)) {
-			// wait possible delay here
-		}
-		TWI_WriteErrorCheck();
+		TWI_WriteWaitAndCheck();
 	}
 	
 	// SEND STOP

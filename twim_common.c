@@ -7,37 +7,51 @@
 
 #include "twi.h"
 
+// SETUP TWI STRUCT
+void TWI_InitStruct(TWI_INFO_STRUCT *TWI_INFO, TWI_PORT port, uint8_t busAddress, uint8_t registerAddress, uint8_t *dataBuff, uint8_t dataLength) {
+	
+	TWI_INFO->port = port;
+	TWI_INFO->mode = MODE_INIT;
+	TWI_INFO->status = STATUS_IDLE;
+	TWI_INFO->state = STATE_REGISTER;
+	TWI_INFO->busAddress = busAddress;
+	TWI_INFO->registerAddress = registerAddress;
+	TWI_INFO->dataBuf = dataBuff;
+	TWI_INFO->dataLength = dataLength;
+	TWI_INFO->dataCount = 0x00;
+}
+
 // WAIT FOR TWI BUS TO BE IDLE
-void TWI_IdleBus(void) {
-	while(!(TWIC.MASTER.STATUS & TWI_MASTER_BUSSTATE_IDLE_gc)) {
+void TWI_IdleBus(TWI_PORT port) {
+	while(!(port.MASTER.STATUS & TWI_MASTER_BUSSTATE_IDLE_gc)) {
 		//do nothing
 		//TODO: Possibly delay here
 	}
 }
 
 // CHECK FOR BUS ERROR WHEN WRITING
-void TWI_WriteErrorCheck(void) {
-	if (!(TWIC.MASTER.STATUS & TWI_MASTER_WIF_bm) || TWIC.MASTER.STATUS & (TWI_MASTER_BUSERR_bm || TWI_MASTER_ARBLOST_bm)) { // WRITE FLAG NOT WRITTEN || (BUSERROR || ARBITRATION LOST)
+void TWI_WriteErrorCheck(TWI_INFO_STRUCT *TWI_INFO) {
+	if (!(TWI_INFO->port.MASTER.STATUS & TWI_MASTER_WIF_bm) || TWI_INFO->port.MASTER.STATUS & (TWI_MASTER_BUSERR_bm || TWI_MASTER_ARBLOST_bm)) { // WRITE FLAG NOT WRITTEN || (BUSERROR || ARBITRATION LOST)
 		// something went wrong
 		//TODO: Error handling
 	}
 }
 
 // CHECK FOR BUS ERROR WHEN READING
-void TWI_ReadErrorCheck(void) {
-	if (!(TWIC.MASTER.STATUS & TWI_MASTER_RIF_bm) || TWIC.MASTER.STATUS & (TWI_MASTER_BUSERR_bm || TWI_MASTER_ARBLOST_bm)) { // READ FLAG NOT WRITTEN || (BUSERROR || ARBITRATION LOST)
+void TWI_ReadErrorCheck(TWI_INFO_STRUCT *TWI_INFO) {
+	if (!(TWI_INFO->port.MASTER.STATUS & TWI_MASTER_RIF_bm) || TWI_INFO->port.MASTER.STATUS & (TWI_MASTER_BUSERR_bm || TWI_MASTER_ARBLOST_bm)) { // READ FLAG NOT WRITTEN || (BUSERROR || ARBITRATION LOST)
 		// something went wrong
 		//TODO: Error handling
 	}
 }
 
 // INITIATE WRITE TO TWI_INFO->bus_address
-void TWI_StartWrite(void) {
+void TWI_StartWrite(TWI_INFO_STRUCT *TWI_INFO) {
 	
 	//RESET VARIABLES
 	TWI_INFO->dataCount = 0x00;
 	
-	TWI_IdleBus();
+	TWI_IdleBus(TWI_INFO->port);
 	TWI_INFO->status = STATUS_BUSY;
 	
 	// SEND START AND BUS ADDRESS WITH WRITE BIT (0)
@@ -45,12 +59,12 @@ void TWI_StartWrite(void) {
 }
 
 // INITIATE READ TO TWI_INFO->bus_address
-void TWI_StartRead(void) {
+void TWI_StartRead(TWI_INFO_STRUCT *TWI_INFO) {
 	
 	//RESET VARIABLES
 	TWI_INFO->dataCount = 0x00;
 	
-	TWI_IdleBus();
+	TWI_IdleBus(TWI_INFO->port);
 	TWI_INFO->status = STATUS_BUSY;
 	
 	// SEND START AND BUS ADDRESS WITH READ BIT (1)
