@@ -8,7 +8,7 @@
 #include "twi.h"
 
 // SETUP TWI STRUCT
-void TWI_InitStruct(TWI_INFO_STRUCT *TWI_INFO, TWI_PORT port, uint8_t busAddress, uint8_t registerAddress, uint8_t *dataBuff, uint8_t dataLength) {
+void TWI_InitStruct(volatile TWI_INFO_STRUCT *TWI_INFO, TWI_PORT *port, uint8_t busAddress, uint8_t registerAddress, volatile uint8_t *dataBuff, uint8_t dataLength) {
 	
 	TWI_INFO->port = port;
 	TWI_INFO->mode = MODE_INIT;
@@ -21,32 +21,42 @@ void TWI_InitStruct(TWI_INFO_STRUCT *TWI_INFO, TWI_PORT port, uint8_t busAddress
 	TWI_INFO->dataCount = 0x00;
 }
 
+// UPDATE TWI STRUCT WITH NEW ADDRESSES
+void TWI_UpdateStruct(volatile TWI_INFO_STRUCT *TWI_INFO, uint8_t busAddress, uint8_t registerAddress, volatile uint8_t *dataBuff, uint8_t dataLength) {
+	
+	TWI_INFO->busAddress = busAddress;
+	TWI_INFO->registerAddress = registerAddress;
+	TWI_INFO->dataBuf = dataBuff;
+	TWI_INFO->dataLength = dataLength;
+	TWI_INFO->dataCount = 0x00;
+}
+
 // WAIT FOR TWI BUS TO BE IDLE
-void TWI_IdleBus(TWI_PORT port) {
-	while(!(port.MASTER.STATUS & TWI_MASTER_BUSSTATE_IDLE_gc)) {
+void TWI_IdleBus(TWI_PORT *port) {
+	while(!(port->MASTER.STATUS & TWI_MASTER_BUSSTATE_IDLE_gc)) {
 		//do nothing
 		//TODO: Possibly delay here
 	}
 }
 
 // CHECK FOR BUS ERROR WHEN WRITING
-void TWI_WriteErrorCheck(TWI_INFO_STRUCT *TWI_INFO) {
-	if (!(TWI_INFO->port.MASTER.STATUS & TWI_MASTER_WIF_bm) || TWI_INFO->port.MASTER.STATUS & (TWI_MASTER_BUSERR_bm || TWI_MASTER_ARBLOST_bm)) { // WRITE FLAG NOT WRITTEN || (BUSERROR || ARBITRATION LOST)
+void TWI_WriteErrorCheck(volatile TWI_INFO_STRUCT *TWI_INFO) {
+	if (!(TWI_INFO->port->MASTER.STATUS & TWI_MASTER_WIF_bm) || TWI_INFO->port->MASTER.STATUS & (TWI_MASTER_BUSERR_bm || TWI_MASTER_ARBLOST_bm)) { // WRITE FLAG NOT WRITTEN || (BUSERROR || ARBITRATION LOST)
 		// something went wrong
 		//TODO: Error handling
 	}
 }
 
 // CHECK FOR BUS ERROR WHEN READING
-void TWI_ReadErrorCheck(TWI_INFO_STRUCT *TWI_INFO) {
-	if (!(TWI_INFO->port.MASTER.STATUS & TWI_MASTER_RIF_bm) || TWI_INFO->port.MASTER.STATUS & (TWI_MASTER_BUSERR_bm || TWI_MASTER_ARBLOST_bm)) { // READ FLAG NOT WRITTEN || (BUSERROR || ARBITRATION LOST)
+void TWI_ReadErrorCheck(volatile TWI_INFO_STRUCT *TWI_INFO) {
+	if (!(TWI_INFO->port->MASTER.STATUS & TWI_MASTER_RIF_bm) || TWI_INFO->port->MASTER.STATUS & (TWI_MASTER_BUSERR_bm || TWI_MASTER_ARBLOST_bm)) { // READ FLAG NOT WRITTEN || (BUSERROR || ARBITRATION LOST)
 		// something went wrong
 		//TODO: Error handling
 	}
 }
 
 // INITIATE WRITE TO TWI_INFO->bus_address
-void TWI_StartWrite(TWI_INFO_STRUCT *TWI_INFO) {
+void TWI_StartWrite(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	
 	//RESET VARIABLES
 	TWI_INFO->dataCount = 0x00;
@@ -59,7 +69,7 @@ void TWI_StartWrite(TWI_INFO_STRUCT *TWI_INFO) {
 }
 
 // INITIATE READ TO TWI_INFO->bus_address
-void TWI_StartRead(TWI_INFO_STRUCT *TWI_INFO) {
+void TWI_StartRead(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	
 	//RESET VARIABLES
 	TWI_INFO->dataCount = 0x00;

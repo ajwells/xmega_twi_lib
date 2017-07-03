@@ -5,13 +5,9 @@
  *  Author: awells
  */ 
 
-typedef int pedantic; // FOR PEDANTIC COMPILER WARNING
-
-#ifdef TWIM_POLL
 #include "twi.h"
+#ifdef TWIM_POLL
 #include <util/atomic.h>
-
-volatile TWI_INFO_STRUCT *TWI_INFO;
 
 //--------------------------------------------------------------------
 // TODO: CHECK IF OUT OF BOUNDS ON DATA BUFFER
@@ -31,6 +27,7 @@ volatile TWI_INFO_STRUCT *TWI_INFO;
 
 void TWI_InitMaster_Poll(void) {
 	
+	#ifdef USE_TWIC
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 		PR.PRPC &= ~PR_TWI_bm; // ENSURE TWI CLOCK IS ACTIVE
 	
@@ -43,106 +40,126 @@ void TWI_InitMaster_Poll(void) {
 
 	
 		TWIC.MASTER.STATUS = TWI_MASTER_BUSSTATE_IDLE_gc; // PUT TWI BUS INTO IDLE STATE
-	
-		TWI_INFO->mode = MODE_IDLE;
 	}
+	#endif //USE_TWIC
+	#ifdef USE_TWIE
+	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+		PR.PRPC &= ~PR_TWI_bm; // ENSURE TWI CLOCK IS ACTIVE
+		
+		TWIE.MASTER.BAUD = 65; // 100KHz, (Fclk/(2*Ftwi)) -5 //TODO: change this so it is not hard coded with fclk
+		
+		TWIE.CTRL = 0; // SDA HOLD TIME OFF
+		TWIE.MASTER.CTRLA = TWI_MASTER_ENABLE_bm; // ENABLE WITH NO INTERRUPTS
+		TWIE.MASTER.CTRLB = TWI_MASTER_TIMEOUT_200US_gc; // SET TIMEOUT FOR BUS TO 200US
+		TWIE.MASTER.CTRLC = 0; // CLEAR COMMAND REGISTER
+
+		
+		TWIE.MASTER.STATUS = TWI_MASTER_BUSSTATE_IDLE_gc; // PUT TWI BUS INTO IDLE STATE
+	}
+	#endif //USE_TWIE
 }
 
-void TWI_WriteWaitAndCheck(void) {
+void TWI_RegisterStruct_Poll(volatile TWI_INFO_STRUCT *TWI_INFO) {
+	TWI_INFO->mode = MODE_IDLE;
+}
+
+void TWI_WriteWaitAndCheck(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	
-	while (!(TWIC.MASTER.STATUS & TWI_MASTER_WIF_bm)) {
+	while (!(TWI_INFO->port->MASTER.STATUS & TWI_MASTER_WIF_bm)) {
 		// wait possible delay here
 	}
 	
-	TWI_WriteErrorCheck();
+	TWI_WriteErrorCheck(TWI_INFO);
 }
 
-void TWI_ReadWaitAndCheck(void) {
+void TWI_ReadWaitAndCheck(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	
-	while (!(TWIC.MASTER.STATUS & (TWI_MASTER_RIF_bm | TWI_MASTER_BUSERR_bm | TWI_MASTER_ARBLOST_bm))) {
+	while (!(TWI_INFO->port->MASTER.STATUS & (TWI_MASTER_RIF_bm | TWI_MASTER_BUSERR_bm | TWI_MASTER_ARBLOST_bm))) {
 		// wait possible delay here
 	}
 	
-	TWI_ReadErrorCheck();
+	TWI_ReadErrorCheck(TWI_INFO);
 }
 
 // READ DATA FROM REG
-void TWI_ReadReg_Poll(void) {
+void TWI_ReadReg_Poll(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	
 	TWI_INFO->mode = MODE_MASTER_READ_REG;
-	TWI_StartWrite();
+	TWI_StartWrite(TWI_INFO);
 	
-	TWI_WriteWaitAndCheck();
+	TWI_WriteWaitAndCheck(TWI_INFO);
 	
 	// WRITE ADDRESS
-	TWIC.MASTER.DATA = TWI_INFO->registerAddress;
+	TWI_INFO->port->MASTER.DATA = TWI_INFO->registerAddress;
 	TWI_INFO->state = STATE_DATA;
 	
-	TWI_WriteWaitAndCheck();
+	TWI_WriteWaitAndCheck(TWI_INFO);
 	
 	// SEND REPEATED START
 	TWI_INFO->mode = MODE_MASTER_READ;
 	TWI_INFO->state = STATE_DATA;
-	TWIC.MASTER.ADDR = ((TWI_INFO->busAddress) << 1 | 0x01); // SEND REPEATED START
+	TWI_INFO->port->MASTER.ADDR = ((TWI_INFO->busAddress) << 1 | 0x01); // SEND REPEATED START
 	
-	TWI_ReadWaitAndCheck();
+	TWI_ReadWaitAndCheck(TWI_INFO);
 	
 	for (TWI_INFO->dataCount=0; TWI_INFO->dataCount < TWI_INFO->dataLength; TWI_INFO->dataCount++) {
-		TWI_INFO->dataBuf[TWI_INFO->dataCount] = TWIC.MASTER.DATA;
-		TWI_ReadWaitAndCheck();
+		TWI_INFO->dataBuf[TWI_INFO->dataCount] = TWI_INFO->port->MASTER.DATA;
+		TWI_INFO->port->MASTER.CTRLC = TWI_MASTER_CMD_RECVTRANS_gc;
+		TWI_ReadWaitAndCheck(TWI_INFO);
 	}
 	
 	// SEND STOP
 	TWI_INFO->mode = MODE_IDLE;
 	TWI_INFO->status = STATUS_SUCCESS;
 	TWI_INFO->status = STATE_REGISTER;
-	TWIC.MASTER.CTRLC = TWI_MASTER_ACKACT_bm | TWI_MASTER_CMD_STOP_gc;
+	TWI_INFO->port->MASTER.CTRLC = TWI_MASTER_ACKACT_bm | TWI_MASTER_CMD_STOP_gc;
 }
 
 // READ DATA
-void TWI_Read_Poll(void) {
+void TWI_Read_Poll(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	
 	TWI_INFO->mode = MODE_MASTER_READ;
-	TWI_StartRead();
+	TWI_StartRead(TWI_INFO);
 	
-	TWI_ReadWaitAndCheck();
+	TWI_ReadWaitAndCheck(TWI_INFO);
 	
 	for (TWI_INFO->dataCount=0; TWI_INFO->dataCount < TWI_INFO->dataLength; TWI_INFO->dataCount++) {
-		TWI_INFO->dataBuf[TWI_INFO->dataCount] = TWIC.MASTER.DATA;
-		TWI_ReadWaitAndCheck();
+		TWI_INFO->dataBuf[TWI_INFO->dataCount] = TWI_INFO->port->MASTER.DATA;
+		TWI_INFO->port->MASTER.CTRLC = TWI_MASTER_CMD_RECVTRANS_gc;
+		TWI_ReadWaitAndCheck(TWI_INFO);
 	}
 	
 	// SEND STOP
 	TWI_INFO->mode = MODE_IDLE;
 	TWI_INFO->status = STATUS_SUCCESS;
 	TWI_INFO->status = STATE_REGISTER;
-	TWIC.MASTER.CTRLC = TWI_MASTER_ACKACT_bm | TWI_MASTER_CMD_STOP_gc;
+	TWI_INFO->port->MASTER.CTRLC = TWI_MASTER_ACKACT_bm | TWI_MASTER_CMD_STOP_gc;
 }
 
 // WRITE DATA
-void TWI_Write_Poll(void) {
+void TWI_Write_Poll(volatile TWI_INFO_STRUCT *TWI_INFO) {
 	
 	TWI_INFO->mode = MODE_MASTER_WRITE;
-	TWI_StartWrite();
+	TWI_StartWrite(TWI_INFO);
 	
-	TWI_WriteWaitAndCheck();
+	TWI_WriteWaitAndCheck(TWI_INFO);
 	
 	// WRITE ADDRESS
-	TWIC.MASTER.DATA = TWI_INFO->registerAddress;
+	TWI_INFO->port->MASTER.DATA = TWI_INFO->registerAddress;
 	TWI_INFO->state = STATE_DATA;
 	
-	TWI_WriteWaitAndCheck();
+	TWI_WriteWaitAndCheck(TWI_INFO);
 	
 	// WRITE DATA
 	for (TWI_INFO->dataCount=0; TWI_INFO->dataCount < TWI_INFO->dataLength; TWI_INFO->dataCount++) {
-		TWIC.MASTER.DATA = TWI_INFO->dataBuf[TWI_INFO->dataCount];
-		TWI_WriteWaitAndCheck();
+		TWI_INFO->port->MASTER.DATA = TWI_INFO->dataBuf[TWI_INFO->dataCount];
+		TWI_WriteWaitAndCheck(TWI_INFO);
 	}
 	
 	// SEND STOP
 	TWI_INFO->mode = MODE_IDLE;
 	TWI_INFO->status = STATUS_SUCCESS;
 	TWI_INFO->status = STATE_REGISTER;
-	TWIC.MASTER.CTRLC = TWI_MASTER_CMD_STOP_gc;
+	TWI_INFO->port->MASTER.CTRLC = TWI_MASTER_CMD_STOP_gc;
 }
 #endif //TWIM_POLL

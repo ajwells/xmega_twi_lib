@@ -5,14 +5,10 @@
  *  Author: awells
  */ 
 
-typedef int pedantic; // FOR PEDANTIC COMPILER WARNING
-
-#ifdef TWIM_INT
 #include "twi.h"
+#ifdef TWIM_INT
 #include <avr/interrupt.h>
 #include <util/atomic.h>
-
-volatile TWI_INFO_STRUCT *TWI_INFO;
 
 //--------------------------------------------------------------------
 // TODO: CHECK IF OUT OF BOUNDS ON DATA BUFFER
@@ -38,8 +34,9 @@ volatile TWI_INFO_STRUCT *TWI_INFO;
 //--------------------------
 
 // SETUP TWI
-void TWI_InitMasterInt(TWI_INFO_STRUCT *TWI_INFO, TWI_MASTER_INTLVL_t twi_master_intlv) {
+void TWI_InitMaster_Int(TWI_MASTER_INTLVL_t twi_master_intlv) {
 	
+	#ifdef USE_TWIC
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 		PR.PRPC &= ~PR_TWI_bm; // ENSURE TWI CLOCK IS ACTIVE
 	
@@ -51,16 +48,32 @@ void TWI_InitMasterInt(TWI_INFO_STRUCT *TWI_INFO, TWI_MASTER_INTLVL_t twi_master
 		TWIC.MASTER.CTRLC = 0; // CLEAR COMMAND REGISTER
 	
 		TWIC.MASTER.STATUS = TWI_MASTER_BUSSTATE_IDLE_gc; // PUT TWI BUS INTO IDLE STATE
-	
-		TWI_INFO->mode = MODE_IDLE;
 	}
+	#endif //USE_TWIC
+	#ifdef USE_TWIE
+	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+		PR.PRPC &= ~PR_TWI_bm; // ENSURE TWI CLOCK IS ACTIVE
+		
+		TWIE.MASTER.BAUD = 65; // 100KHz, (Fclk/(2*Ftwi)) -5 //TODO: change this so it is not hard coded with fclk
+		
+		TWIE.CTRL = 0; // SDA HOLD TIME OFF
+		TWIE.MASTER.CTRLA = twi_master_intlv | TWI_MASTER_RIEN_bm | TWI_MASTER_WIEN_bm | TWI_MASTER_ENABLE_bm; // SET INTERRUPT LV | ENABLE READ INTERRUPT | ENABLE WRITE INTERRUPT | ENABLE TWI
+		TWIE.MASTER.CTRLB = TWI_MASTER_TIMEOUT_200US_gc; // SET TIMEOUT FOR BUS TO 200US
+		TWIE.MASTER.CTRLC = 0; // CLEAR COMMAND REGISTER
+		
+		TWIE.MASTER.STATUS = TWI_MASTER_BUSSTATE_IDLE_gc; // PUT TWI BUS INTO IDLE STATE
+	}
+	#endif //USE_TWIE
 }
 
 // REGISTER TWI STRUCT FOR ISR's
-void TWI_RegisterStruct(TWI_INFO_STRUCT *TWI_INFO) {
-	if (TWI_INFO->port == PORT_TWIC) {
+void TWI_RegisterStruct_Int(volatile TWI_INFO_STRUCT *TWI_INFO) {
+		
+	TWI_INFO->mode = MODE_IDLE;
+	
+	if (TWI_INFO->port == &(PORT_TWIC)) {
 		TWIC_INFO = TWI_INFO;
-	} else if (TWI_INFO->port == PORT_TWIE) {
+	} else if (TWI_INFO->port == &(PORT_TWIE)) {
 		TWIE_INFO = TWI_INFO;
 	} else {
 		// not a valid port
@@ -68,21 +81,24 @@ void TWI_RegisterStruct(TWI_INFO_STRUCT *TWI_INFO) {
 }
 
 // READ DATA FROM REG
-void TWI_ReadReg_Int(void) {
+void TWI_ReadReg_Int(volatile TWI_INFO_STRUCT *TWI_INFO) {
+	TWI_INFO->status = STATUS_BUSY;
 	TWI_INFO->mode = MODE_MASTER_READ_REG;
-	TWI_StartWrite();
+	TWI_StartWrite(TWI_INFO);
 }
 
 // READ DATA
-void TWI_Read_Int(void) {
+void TWI_Read_Int(volatile TWI_INFO_STRUCT *TWI_INFO) {
+	TWI_INFO->status = STATUS_BUSY;
 	TWI_INFO->mode = MODE_MASTER_READ;
-	TWI_StartRead();
+	TWI_StartRead(TWI_INFO);
 }
 
 // WRITE DATA
-void TWI_Write_Int(void) {
+void TWI_Write_Int(volatile TWI_INFO_STRUCT *TWI_INFO) {
+	TWI_INFO->status = STATUS_BUSY;
 	TWI_INFO->mode = MODE_MASTER_WRITE;
-	TWI_StartWrite();
+	TWI_StartWrite(TWI_INFO);
 }
 
 #ifdef USE_TWIC
@@ -106,7 +122,7 @@ ISR(TWIC_TWIM_vect) {
 					} else { // SEND STOP
 						TWIC_INFO->mode = MODE_IDLE;
 						TWIC_INFO->status = STATUS_SUCCESS;
-						TWIC_INFO->status = STATE_REGISTER;
+						TWIC_INFO->state = STATE_REGISTER;
 						TWIC.MASTER.CTRLC = TWI_MASTER_CMD_STOP_gc;
 					}
 					break;
@@ -128,7 +144,7 @@ ISR(TWIC_TWIM_vect) {
 						} else { // SEND STOP
 							TWIC_INFO->mode = MODE_IDLE;
 							TWIC_INFO->status = STATUS_SUCCESS;
-							TWIC_INFO->status = STATE_REGISTER;
+							TWIC_INFO->state = STATE_REGISTER;
 							TWIC.MASTER.CTRLC = TWI_MASTER_ACKACT_bm | TWI_MASTER_CMD_STOP_gc;
 						}
 					}
@@ -184,7 +200,7 @@ ISR(TWIE_TWIM_vect) {
 						} else { // SEND STOP
 						TWIE_INFO->mode = MODE_IDLE;
 						TWIE_INFO->status = STATUS_SUCCESS;
-						TWIE_INFO->status = STATE_REGISTER;
+						TWIE_INFO->state = STATE_REGISTER;
 						TWIE.MASTER.CTRLC = TWI_MASTER_CMD_STOP_gc;
 					}
 					break;
@@ -206,7 +222,7 @@ ISR(TWIE_TWIM_vect) {
 							} else { // SEND STOP
 							TWIE_INFO->mode = MODE_IDLE;
 							TWIE_INFO->status = STATUS_SUCCESS;
-							TWIE_INFO->status = STATE_REGISTER;
+							TWIE_INFO->state = STATE_REGISTER;
 							TWIE.MASTER.CTRLC = TWI_MASTER_ACKACT_bm | TWI_MASTER_CMD_STOP_gc;
 						}
 					}
