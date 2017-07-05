@@ -16,7 +16,7 @@ void TWI_InitMaster_Poll(void) {
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 		PR.PRPC &= ~PR_TWI_bm; // ENSURE TWI CLOCK IS ACTIVE
 	
-		TWIC.MASTER.BAUD = 65; // 100KHz, (Fclk/(2*Ftwi)) -5 //TODO: change this so it is not hard coded with fclk
+		TWIC.MASTER.BAUD = (F_CPU/(2*TWI_FREQ)) - 5;
 	
 		TWIC.CTRL = 0; // SDA HOLD TIME OFF
 		TWIC.MASTER.CTRLA = TWI_MASTER_ENABLE_bm; // ENABLE WITH NO INTERRUPTS
@@ -31,7 +31,7 @@ void TWI_InitMaster_Poll(void) {
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 		PR.PRPC &= ~PR_TWI_bm; // ENSURE TWI CLOCK IS ACTIVE
 		
-		TWIE.MASTER.BAUD = 65; // 100KHz, (Fclk/(2*Ftwi)) -5 //TODO: change this so it is not hard coded with fclk
+		TWIE.MASTER.BAUD = (F_CPU/(2*TWI_FREQ)) - 5;
 		
 		TWIE.CTRL = 0; // SDA HOLD TIME OFF
 		TWIE.MASTER.CTRLA = TWI_MASTER_ENABLE_bm; // ENABLE WITH NO INTERRUPTS

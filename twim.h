@@ -8,19 +8,20 @@
 //--------------------------------------------------------------------
 // TODO: CHECK IF OUT OF BOUNDS ON DATA BUFFER
 // TODO: ASSUMES REGISTER ADDRESSES ARE ONLY 1 BYTE
-// TODO: CALCULATE BUAD WITH F_CPU
 // TODO: ERROR CHECKING
 // TODO: CHECK RXACK REG IN ERROR CHECKING
 // TODO: CHECK WIF WHEN SENDING NACK IN MASTER READ
 // TODO: CHECK WHAT NEEDS TO BE ATOMIC
+// TODO: MAKE SURE DEFINES ARE DEFINED
 //--------------------------------------------------------------------
 
 //--------------------------------------------------------------------
 // TO USE:
 //	-make sure to define F_CPU
-//  -DEFINE TWIM_POLL for polling lib
+//	-DEFINE TWIM_POLL for polling lib
 // 	-DEFINE TWIM_INT for interrupt lib
 //	-DEFINE USE_TWIC/USE_TWIE for correct TWI Port
+//	-DEFINE TWI_FREQ and F_CPU for correct BUAD calculation
 //	-make sure to enable global interrupts (sei) for interrupt lib
 //	-make sure to enable correct interrupt levels (PMIC.CTRL) for interrupt lib
 //--------------------------------------------------------------------
@@ -33,9 +34,11 @@
 
 // DEFINES FOR LIB USAGE
 #define USE_TWIC
-#define USE_TWIE
+//#define USE_TWIE
 #define TWIM_POLL
-#define TWIM_INT
+//#define TWIM_INT
+#define TWI_FREQ 100000 // 100kHz
+#define F_CPU 2000000 // 2 MHz
 
 // VALUES
 #define PORT_TWIC TWIC
